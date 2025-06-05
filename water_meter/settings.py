@@ -39,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'crispy_forms',
     'crispy_bootstrap5',
-    'meter.apps.MeterConfig',
+    'meter',
 ]
 
 # Crispy Forms Settings
