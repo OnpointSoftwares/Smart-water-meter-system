@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}{{ title }} - Smart Water Meter{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">{{ title }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% if meter %}{% url 'meter:meter_detail' meter.id %}{% else %}{% url 'meter:dashboard' %}{% endif %}" 
+                           class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Cancel
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save me-1"></i> Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set the installation date to today by default for new meters
+        const installationDateField = document.getElementById('id_installation_date');
+        if (installationDateField && !installationDateField.value) {
+            const today = new Date().toISOString().split('T')[0];
+            installationDateField.value = today;
+        }
+    });
+</script>
+{% endblock %}

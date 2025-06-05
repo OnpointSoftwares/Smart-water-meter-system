@@ -1,0 +1,294 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Dashboard - Smart Water Meter{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Dashboard</h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'meter:add_meter' %}" class="btn btn-sm btn-outline-primary">
+                <i class="fas fa-plus me-1"></i> Add Meter
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Alerts -->
+{% if active_alerts %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <h5><i class="fas fa-exclamation-triangle me-2"></i>Active Alerts</h5>
+    <ul class="mb-0">
+        {% for alert in active_alerts %}
+            <li>
+                <strong>{{ alert.meter.name }}:</strong> {{ alert.message }}
+                <small class="text-muted ms-2">{{ alert.created_at|timesince }} ago</small>
+            </li>
+        {% endfor %}
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+</div>
+{% endif %}
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Active Meters</h6>
+                        <h2 class="mb-0">{{ meters.count }}</h2>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-tachometer-alt text-primary fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">This Month's Usage</h6>
+                        <h2 class="mb-0">{{ monthly_usage|floatformat:2 }} L</h2>
+                    </div>
+                    <div class="bg-success bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-tint text-success fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="text-muted mb-1">Active Alerts</h6>
+                        <h2 class="mb-0">{{ active_alerts.count }}</h2>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 p-3 rounded-circle">
+                        <i class="fas fa-bell text-warning fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Water Meters -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Your Water Meters</h5>
+        <small><a href="#" class="text-decoration-none">View All</a></small>
+    </div>
+    <div class="card-body p-0">
+        {% if meters %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Meter Name</th>
+                            <th>Meter ID</th>
+                            <th>Type</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Last Reading</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for meter in meters %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'meter:meter_detail' meter.id %}" class="text-decoration-none">
+                                        <strong>{{ meter.name }}</strong>
+                                    </a>
+                                </td>
+                                <td><code>{{ meter.meter_id }}</code></td>
+                                <td>{{ meter.get_meter_type_display }}</td>
+                                <td>{{ meter.location|default:"-" }}</td>
+                                <td>
+                                    {% if meter.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% with last_reading=meter.usages.first %}
+                                        {% if last_reading %}
+                                            {{ last_reading.volume|floatformat:2 }} L
+                                            <small class="text-muted d-block">{{ last_reading.timestamp|timesince }} ago</small>
+                                        {% else %}
+                                            <span class="text-muted">No readings</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'meter:meter_detail' meter.id %}" class="btn btn-outline-primary">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'meter:edit_meter' meter.id %}" class="btn btn-outline-secondary">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center p-5">
+                <div class="mb-3">
+                    <i class="fas fa-tint fa-4x text-muted"></i>
+                </div>
+                <h5>No water meters found</h5>
+                <p class="text-muted">Get started by adding your first water meter.</p>
+                <a href="{% url 'meter:add_meter' %}" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Add Water Meter
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="row">
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Recent Water Usage</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_usage %}
+                    <div class="list-group list-group-flush">
+                        {% for usage in recent_usage %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ usage.meter.name }}</h6>
+                                    <small class="text-muted">{{ usage.timestamp|timesince }} ago</small>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <span class="badge bg-{{ usage.is_leak|yesno:'danger,primary' }} me-2">
+                                            {{ usage.volume|floatformat:2 }} L
+                                        </span>
+                                        <small class="text-muted">
+                                            {{ usage.flow_rate|floatformat:2 }} L/min
+                                        </small>
+                                    </div>
+                                    {% if usage.is_leak %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-exclamation-triangle me-1"></i> Leak Detected
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center p-5">
+                        <div class="mb-3">
+                            <i class="fas fa-tint-slash fa-3x text-muted"></i>
+                        </div>
+                        <p class="text-muted mb-0">No recent water usage data available.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Usage This Week</h5>
+                <div class="dropdown">
+                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="timeRangeDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                        This Week
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="timeRangeDropdown">
+                        <li><a class="dropdown-item" href="#">Today</a></li>
+                        <li><a class="dropdown-item active" href="#">This Week</a></li>
+                        <li><a class="dropdown-item" href="#">This Month</a></li>
+                        <li><a class="dropdown-item" href="#">This Year</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-body">
+                <canvas id="weeklyUsageChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Weekly Usage Chart
+    document.addEventListener('DOMContentLoaded', function() {
+        const ctx = document.getElementById('weeklyUsageChart').getContext('2d');
+        
+        // Sample data - replace with actual data from your backend
+        const weeklyData = {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Water Usage (Liters)',
+                data: [120, 150, 180, 90, 210, 170, 140],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                tension: 0.3
+            }]
+        };
+        
+        const weeklyConfig = {
+            type: 'line',
+            data: weeklyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.y} L`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Liters'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + ' L';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        };
+        
+        new Chart(ctx, weeklyConfig);
+    });
+</script>
+{% endblock %}

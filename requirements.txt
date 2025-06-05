@@ -1,0 +1,7 @@
+Django==4.2.7
+pyserial==3.5
+django-crispy-forms==2.0
+crispy-bootstrap5==2023.10
+# Using pandas 2.0.3 for better compatibility with Python 3.13
+pandas==2.0.3
+matplotlib==3.7.1

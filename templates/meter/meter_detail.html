@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}{{ meter.name }} - Smart Water Meter{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-4">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="{% url 'meter:dashboard' %}">Dashboard</a></li>
+        <li class="breadcrumb-item active" aria-current="page">{{ meter.name }}</li>
+    </ol>
+</nav>
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-2 pb-2 mb-3">
+    <div class="d-flex align-items-center">
+        <h1 class="h2 mb-0 me-3">{{ meter.name }}</h1>
+        <span class="badge bg-{{ meter.is_active|yesno:'success,secondary' }} align-middle">
+            {{ meter.is_active|yesno:"Active,Inactive" }}
+        </span>
+    </div>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <div class="btn-group me-2">
+            <a href="{% url 'meter:edit_meter' meter.id %}" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-edit me-1"></i> Edit
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                <i class="fas fa-trash-alt me-1"></i> Delete
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Meter Info Cards -->
+<div class="row mb-4">
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Meter ID</h6>
+                <h5 class="mb-0"><code>{{ meter.meter_id }}</code></h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Type</h6>
+                <h5 class="mb-0">{{ meter.get_meter_type_display }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Location</h6>
+                <h5 class="mb-0">{{ meter.location|default:"Not specified" }}</h5>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-lg-3 mb-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="text-muted mb-1">Installed On</h6>
+                <h5 class="mb-0">{{ meter.installation_date|date:"M d, Y" }}</h5>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content -->
+<div class="row">
+    <!-- Usage Charts -->
+    <div class="col-lg-8 mb-4">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Water Usage</h5>
+                <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary active" data-period="day">Day</button>
+                    <button type="button" class="btn btn-outline-secondary" data-period="week">Week</button>
+                    <button type="button" class="btn btn-outline-secondary" data-period="month">Month</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chart-container" style="position: relative; height: 300px;">
+                    <canvas id="usageChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="col-lg-4 mb-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Quick Stats</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Today's Usage</h6>
+                    <div class="d-flex align-items-end">
+                        <h2 class="mb-0 me-2">{{ today_usage.volume__sum|default:"0.00"|floatformat:2 }}</h2>
+                        <p class="text-muted mb-1">liters</p>
+                    </div>
+                    <div class="progress mt-2" style="height: 8px;">
+                        <div class="progress-bar bg-primary" role="progressbar" 
+                             style="width: {{ today_usage.volume__sum|default:0|div:100|mul:100|floatformat:0 }}%" 
+                             aria-valuenow="{{ today_usage.volume__sum|default:0 }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100"></div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Average Daily Usage</h6>
+                    <div class="d-flex align-items-end">
+                        <h2 class="mb-0 me-2">{{ avg_daily_usage.volume__avg|default:"0.00"|floatformat:2 }}</h2>
+                        <p class="text-muted mb-1">liters/day</p>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h6 class="text-muted mb-2">Current Flow Rate</h6>
+                    <div class="d-flex align-items-end">
+                        <h2 class="mb-0 me-2">
+                            {{ recent_readings.0.flow_rate|default:"0.00"|floatformat:2 }}
+                        </h2>
+                        <p class="text-muted mb-1">L/min</p>
+                    </div>
+                    <div class="mt-1">
+                        {% if recent_readings.0 and recent_readings.0.is_leak %}
+                            <span class="badge bg-danger">
+                                <i class="fas fa-exclamation-triangle me-1"></i> Possible Leak Detected
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success">
+                                <i class="fas fa-check-circle me-1"></i> Normal
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="d-grid">
+                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addReadingModal">
+                        <i class="fas fa-plus-circle me-2"></i>Add Manual Reading
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Readings -->
+<div class="row">
+    <div class="col-12 mb-4">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Readings</h5>
+                <a href="#" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if recent_readings %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Volume (L)</th>
+                                    <th>Flow Rate (L/min)</th>
+                                    <th>Temperature (°C)</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for reading in recent_readings %}
+                                    <tr>
+                                        <td>{{ reading.timestamp|date:"M d, Y H:i" }}</td>
+                                        <td>{{ reading.volume|floatformat:2 }}</td>
+                                        <td>{{ reading.flow_rate|floatformat:2 }}</td>
+                                        <td>{{ reading.temperature|default:"-"|floatformat:1 }}</td>
+                                        <td>
+                                            {% if reading.is_leak %}
+                                                <span class="badge bg-danger">
+                                                    <i class="fas fa-exclamation-triangle me-1"></i> Leak
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-success">
+                                                    <i class="fas fa-check-circle me-1"></i> Normal
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-center p-5">
+                        <div class="mb-3">
+                            <i class="fas fa-tint-slash fa-3x text-muted"></i>
+                        </div>
+                        <h5>No readings available</h5>
+                        <p class="text-muted">Start monitoring to see water usage data.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the water meter <strong>{{ meter.name }}</strong>?</p>
+                <p class="text-danger">
+                    <i class="fas fa-exclamation-circle me-1"></i> 
+                    This action cannot be undone. All associated data will be permanently deleted.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{% url 'meter:delete_meter' meter.id %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="fas fa-trash-alt me-1"></i> Delete Permanently
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Manual Reading Modal -->
+<div class="modal fade" id="addReadingModal" tabindex="-1" aria-labelledby="addReadingModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addReadingModalLabel">
+                    <i class="fas fa-plus-circle me-2"></i>Add Manual Reading
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" action="#">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="volume" class="form-label">Volume (liters)</label>
+                        <input type="number" step="0.01" class="form-control" id="volume" name="volume" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="flow_rate" class="form-label">Flow Rate (L/min)</label>
+                        <input type="number" step="0.01" class="form-control" id="flow_rate" name="flow_rate" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="temperature" class="form-label">Temperature (°C) <span class="text-muted">(optional)</span></label>
+                        <input type="number" step="0.1" class="form-control" id="temperature" name="temperature">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="is_leak" name="is_leak">
+                        <label class="form-check-label" for="is_leak">
+                            Mark as leak detection
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Reading
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize chart
+        const ctx = document.getElementById('usageChart').getContext('2d');
+        
+        // Sample data - replace with actual data from your backend
+        const dailyData = {
+            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+            datasets: [{
+                label: 'Water Usage (Liters)',
+                data: Array.from({length: 24}, () => Math.floor(Math.random() * 50) + 10),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                tension: 0.3
+            }]
+        };
+        
+        const weeklyData = {
+            labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+            datasets: [{
+                label: 'Water Usage (Liters)',
+                data: [120, 150, 180, 90, 210, 170, 140],
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                tension: 0.3
+            }]
+        };
+        
+        const monthlyData = {
+            labels: Array.from({length: 12}, (_, i) => new Date(0, i).toLocaleString('default', { month: 'short' })),
+            datasets: [{
+                label: 'Water Usage (Liters)',
+                data: Array.from({length: 12}, () => Math.floor(Math.random() * 1000) + 500),
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1,
+                tension: 0.3
+            }]
+        };
+        
+        const chartConfig = {
+            type: 'line',
+            data: dailyData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.parsed.y} L`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Liters'
+                        },
+                        ticks: {
+                            callback: function(value) {
+                                return value + ' L';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        };
+        
+        const usageChart = new Chart(ctx, chartConfig);
+        
+        // Handle period buttons
+        const periodButtons = document.querySelectorAll('[data-period]');
+        periodButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                // Update active button
+                periodButtons.forEach(btn => btn.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Update chart data based on period
+                const period = this.getAttribute('data-period');
+                switch(period) {
+                    case 'day':
+                        usageChart.data = dailyData;
+                        break;
+                    case 'week':
+                        usageChart.data = weeklyData;
+                        break;
+                    case 'month':
+                        usageChart.data = monthlyData;
+                        break;
+                }
+                usageChart.update();
+            });
+        });
+    });
+</script>
+{% endblock %}
